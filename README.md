@@ -11,7 +11,6 @@ Features That Might Be Coming
 
 * The ability to "Try" and acquire a set of resources (for a fixed number of milliseconds + giving up immediately).
 * Some safety against threads being interrupted.
-* Try to guarantee a form of fairness...?
 
 Summary
 -------
@@ -98,7 +97,7 @@ public class ConvolutedSemaphore
 </code>
 </pre>
 
-This example is designed to show that resource groups are powerful - they are able to do anything a binary semaphore can.
+This example is designed to show that resource groups are powerful - they are able to do anything a binary semaphore can do.
 
 ### Connecting Resources
 Suppose you have a remote control in code. Each button on the control is its own class, and interacts with a game to move a character up, down, left and right. For whatever reason, moving the character in two directions at once is not allowed, so you need to ensure that only one button's input is processed at any one time. How can you do this?
@@ -177,7 +176,7 @@ This connects those two resources. Resource groups obey this rule:
 That's it! Now many threads can try to press each button at once, but only one button's press method will be able to do work at any one time.
 
 There are a few important things to note:
-* Each button is unaware of any other button. Even the resource passed to the button is unique to that button - everything else forgets it. (You could have the button create the resource itself, and then let the group)
+* Each button is unaware of any other button. Even the resource passed to the button is unique to that button - everything else forgets it.
 * A thread interacting with the buttons is unaware it is synchronising with every other button - it doesn't have to know that it needs to "lock" all the other buttons as well.
 * When connecting resources, you don't have to connect each resource to every other resource. This will make a lot more sense if you know basic graph theory - connecting two resources adds an (undirected) edge between those resources. Two resources are connected if there is any path (something that follows the edges) in the graph between them. It may also help to think of connecting resource A to resource B as declaring that resource A depends on resource B.
 
@@ -231,12 +230,12 @@ public class RemoteControl
 
 Some highlights:
 * The remote control now has a resource which, when acquired, prevents all of the buttons being pressed.
-* When combining controls, the resource group is asked to acquire two **disconnected** resources.
+* When combining controls, the resource group is asked to acquire two **disconnected** resources. The resources can also be connected in this method (and you can pass as many as you like - params) but they don't have to be.
 * The two controls are combined by connecting each remote control's resource. In terms of the graph of resources, this means that the buttons on both controls are now all connected. Hence, pressing a button on either control stops any button on the opposite control being pressed!
 
 ### Disconnecting Resources
 
-Following from the example above, suppose the owner of the second control, Bob, wants to go home so Alice and Bob need to split the "super remote control" back into two boring regular controls. It would suck if Bob can only play his in his home provided Alice is not playing her game in her home. We need to enable the controls to be used independently again.
+Following from the example above, suppose the owner of the second control, Bob, wants to go home so Alice and Bob need to split the "super remote control" back into two boring regular controls. It would suck if Bob can only play his game in his home provided Alice is not playing her game in her home. We need to enable the controls to be used independently again.
 
 We can do this with the following method:
 <pre>
@@ -252,7 +251,7 @@ public void RemoveFromControl(RemoteControl otherRemoteControl)
 
 <sup>Note: while you could have stopped all buttons being pressed by acquiring either control's resource, resource groups are strict and require you to explicitly acquire any resources you operate on. This is to encourage your code to be aware of what is going on.</sup>
 
-After the above method has been called, two threads can interact with the two controls at the same time, but the only one button on each control can be pressed at any one time.
+After the above method has been called, two threads can interact with the two controls at the same time, but only one button on each control can be pressed at any one time.
 
 #### Warning About Disconnecting Resources
 
@@ -264,8 +263,33 @@ Possibly warranting some method renaming aside, this is considered a good thing.
 
 The above returns all the immediate neighbours of the passed in resource. You can call this on said neighbours repeatedly to discover the structure of the entire graph, but if you need to you probably should try to refactor your code first.
 
-To illustrate why this is a good thing, suppose three remote controls were connected together in a circle - Control A -> Control B -> Control C.
+To illustrate why this is a good thing, suppose three remote controls were connected together in a circle: Control A - Control B - Control C - Control A.
 * If we disconnect control A from control B, should it be possible to use control A and control B at the same time even though control B is connected to C which is connected to A? Probably not.
 * Would it be wise to automatically sever control C's connection from Control A as well? Again, probably not. The connection may have been added somewhere else completely in code, so you have no idea how important it is that these controls remain synchronised
 * Would you be happy that this other area of code could also invalidate your code's belief the controls are synchronised? Hopefully not! That would be scary!!
 
+Implementation Details
+----------------------
+
+### Efficiency
+Each set of connected resources is locked by a single semaphore. This makes acquiring a large set of connected resources very cheap - O(1) ish ignoring other threads and flattening (below).
+
+Connecting two resources is also essentially O(1) (always, as you've acquired them already). This is handled in a similar way to a disjoint set forest - the resources' parents are given a new shared parent (which is basically a semaphore). Whenever the parent is retrieved, the chain is immediately flattened to ensure at least decent amortised performance.
+
+Disconnecting resources is more expensive. This can probably be improved, but currently disconnecting resource A from resource B takes time linear in the size of their original connected group. This is because their parent semaphores might need to be reset on each individual semaphore.
+
+Acquiring disconnected resources in a resource group is done as follows (efficiency quite hard to measure, but generally extremely quick)
+1. Gather all the unique semaphores needs to acquire all the resources (at most one per resource).
+2. Acquire each one in ascending order.
+3. If after acquiring the resource, it is still the correct resource to acquire next, keep it and repeat on the next resource.
+
+Step 3 can cause restarts. If the process restarts enough times, it closes something called a "gate", which prevents further "new" resource groups from doing anything until this resource group has finished. This enforces a form of fairness.
+
+### Memory
+Resource groups are linear in the number of resources they were asked to acquire.
+A resource individually can vary in memory, but if you have n resources the most memory they require is linear in n (ignoring big integers).
+
+### Deadlock handling
+A resource group avoids deadlock while acquiring disconnected resources by:
+1. Always acquiring the resources in ascending order.
+2. Relying on resources only ever increasing. Note that by increasing, resources can change the order in which they should be acquired, causing the acquisition process to partially restart. However, any resource already acquired can be kept.
