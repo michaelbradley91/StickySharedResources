@@ -6,3 +6,4 @@ C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickyShared
 C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\bin\Debug\SharedResources.pdb
 C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\obj\Debug\SharedResources.dll
 C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\obj\Debug\SharedResources.pdb
+C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\obj\Debug\SharedResources.csprojResolveAssemblyReference.cache
