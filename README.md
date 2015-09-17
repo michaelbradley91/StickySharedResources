@@ -21,7 +21,7 @@ The typical use case for this package is when you want to create a collection of
 The package lets you connect resources and disconnect resources at essentially "any time" provided you can first acquire them. It provides a method of acquiring sets of potentially disconnected resources which will do its best to avoid deadlock. (See implementation details at the end if you're interested). Essentially, if it is possible to avoid deadlock, it will.
 
 The name **Sticky Shared Resources** comes from the following:
-* "SharesourceGroupred var  = SharedResourceGroup.CreateWithNoAcquiredSharedResources()" comes from shared memory - memory that is accessed by multiple threads at once.
+* "Shared Resources" comes from shared memory - memory that is accessed by multiple threads at once.
 * "Sticky" comes from connecting the Resources together. If someone wants to acquire / check out a resource, they're forced to take all of the other resources stuck to it.
 
 Code Examples
