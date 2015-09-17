@@ -4,6 +4,13 @@ Disclaimer
 ----------
 This package is brand new and probably has bugs in it! If you find one, email michael.bradley@hotmail.co.uk and I'll look into it if I have time. Feel free to clone this repository and work on it yourself if you want.
 
+Features That Might Be Coming
+-----------------------------
+
+* The ability to "Try" and acquire a set of resources (for a fixed number of milliseconds + giving up immediately).
+* Some safety against threads being interrupted.
+* Try to guarantee a form of fairness...?
+
 Summary
 -------
 **Sticky Shared Resources** is a stepping stone towards simplifying concurrent programming.
@@ -89,6 +96,87 @@ public class ConvolutedSemaphore
 </code>
 </pre>
 
-This example is designed to show that resource groups are powerful - they are able to do anything binary semaphores can.
+This example is designed to show that resource groups are powerful - they are able to do anything a binary semaphore can.
 
 ### Connecting Resources
+Suppose you have a remote control in code. Each button on the control is its own class, and interacts with a game to move a character up, down, left and right. For whatever reason, moving the character in two directions at once is not allowed, so you need to ensure that only one button's input is processed at any one time. How can you do this?
+
+Firstly, we'll need each button to hold onto a resource. Suppose we define a button like this:
+
+<pre>
+<code>
+public class Button
+{
+    private readonly SharedResource sharedResource;
+
+    public Button(SharedResource sharedResource)
+    {
+        this.sharedResource = sharedResource;
+    }
+
+    public void Press()
+    {
+        var resourceGroup = SharedResourceGroup.CreateAcquiringSharedResources(sharedResource);
+        // Do stuff...
+        resourceGroup.FreeSharedResources();
+    }
+}
+</code>
+</pre>
+
+When you press the button, it acquires its resource which we'll utilise to ensure no other button is being pressed.
+The button then does its work, and once it is finished it will release its resource.
+
+Now for the Remote Control. This will need to create its buttons and provide them with the resources. We can do this as follows:
+
+<pre>
+<code>
+public class RemoteControl
+{
+    public readonly Button LeftButton;
+    public readonly Button RightButton;
+    public readonly Button UpButton;
+    public readonly Button DownButton;
+
+    // We're going to "Create - Connect - Allocate" the resources
+    public RemoteControl()
+    {
+        // Create
+        var resourceGroup = SharedResourceGroup.CreateWithNoAcquiredSharedResources();
+        var leftButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        var rightButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        var upButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        var downButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        
+        // Connect
+        resourceGroup.ConnectSharedResources(leftButtonResource, rightButtonResource);
+        resourceGroup.ConnectSharedResources(rightButtonResource, upButtonResource);
+        resourceGroup.ConnectSharedResources(upButtonResource, downButtonResource);
+        resourceGroup.FreeSharedResources();
+        
+        // Allocate
+        LeftButton = new Button(leftButtonResource);
+        RightButton = new Button(rightButtonResource);
+        UpButton = new Button(upButtonResource);
+        DownButton = new Button(downButtonResource);
+    }
+}
+</code>
+</pre>
+
+The important new part is:
+
+<code>resourceGroup.ConnectSharedResources(leftButtonResource, rightButtonResource)</code>
+
+This connects those two resources - it draws a line between them. An important rule is:
+* To acquire a resource, a resource group will acquire all resources that are connected to it, both directly and indirectly.
+
+Hence, it is now impossible for one thread to acquire the left button and another thread, at the same time, to acquire the right button.
+
+That's it! Now many threads can try to press each button at once, but only one button's press method will be able to do work at any one time.
+There are a few important things to note:
+* Each button is unaware of any other button. Even the resource passed to the button is unique to that button - everything else forgets it. (You could have the button create the resource itself, and then let the group)
+* A thread interacting with the buttons is unaware it is synchronising with every other button - it doesn't have to know that it needs to "lock" all the other buttons as well.
+* When connecting resources, you don't have to connect each resource to every other resource. This will make a lot more sense if you know basic graph theory - connecting two resources adds an (undirected) edge between those resources. Two resources are connected if there is any path (something that follows the edges) in the graph between them. It may also help to think of connecting resource A to resource B as declaring that resource A depends on resource B.
+
+After connecting the resources above, you would see the following graph
