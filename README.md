@@ -4,6 +4,8 @@ Disclaimer
 ----------
 This package is brand new and probably has bugs in it! If you find one, email michael.bradley@hotmail.co.uk and I'll look into it if I have time. Feel free to clone this repository and work on it yourself if you want.
 
+I may also have re-invented the wheel - it was fun anyway!
+
 Features That Might Be Coming
 -----------------------------
 
@@ -168,15 +170,102 @@ The important new part is:
 
 <code>resourceGroup.ConnectSharedResources(leftButtonResource, rightButtonResource)</code>
 
-This connects those two resources - it draws a line between them. An important rule is:
-* To acquire a resource, a resource group will acquire all resources that are connected to it, both directly and indirectly.
+This connects those two resources. Resource groups obey this rule:
 
-Hence, it is now impossible for one thread to acquire the left button and another thread, at the same time, to acquire the right button.
+*To acquire a resource, you must acquire all resources that are connected to it, both directly and indirectly*
 
 That's it! Now many threads can try to press each button at once, but only one button's press method will be able to do work at any one time.
+
 There are a few important things to note:
 * Each button is unaware of any other button. Even the resource passed to the button is unique to that button - everything else forgets it. (You could have the button create the resource itself, and then let the group)
 * A thread interacting with the buttons is unaware it is synchronising with every other button - it doesn't have to know that it needs to "lock" all the other buttons as well.
 * When connecting resources, you don't have to connect each resource to every other resource. This will make a lot more sense if you know basic graph theory - connecting two resources adds an (undirected) edge between those resources. Two resources are connected if there is any path (something that follows the edges) in the graph between them. It may also help to think of connecting resource A to resource B as declaring that resource A depends on resource B.
 
-After connecting the resources above, you would see the following graph
+Suppose later someone comes along with another remote control, and now it is possible to create a "super remote control" by combining the two. However, even on the super remote control you can still only press one button at a time. We can retrospectively combine the remote controls with a small adjustment:
+
+<pre>
+<code>
+public class RemoteControl
+{
+    private readonly SharedResource resource;
+    public readonly Button LeftButton;
+    public readonly Button RightButton;
+    public readonly Button UpButton;
+    public readonly Button DownButton;
+
+    public RemoteControl()
+    {
+        var resourceGroup = SharedResourceGroup.CreateWithNoAcquiredSharedResources();
+        
+        // Create a resource for the remote control itself. This gives it a handle on its buttons
+        resource = resourceGroup.CreateAndAcquireSharedResource();
+        var leftButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        var rightButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        var upButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        var downButtonResource = resourceGroup.CreateAndAcquireSharedResource();
+        
+        // Connect the remote control's resource to all of the buttons.
+        // (It is indirectly connected to the right, up and down buttons).
+        resourceGroup.ConnectSharedResources(resource, leftButtonResource);
+        resourceGroup.ConnectSharedResources(leftButtonResource, rightButtonResource);
+        resourceGroup.ConnectSharedResources(rightButtonResource, upButtonResource);
+        resourceGroup.ConnectSharedResources(upButtonResource, downButtonResource);
+        resourceGroup.FreeSharedResources();
+
+        LeftButton = new Button(leftButtonResource);
+        RightButton = new Button(rightButtonResource);
+        UpButton = new Button(upButtonResource);
+        DownButton = new Button(downButtonResource);
+    }
+
+    // Combine the controls!
+    public void CombineWithControl(RemoteControl otherRemoteControl)
+    {
+        var resourceGroup = SharedResourceGroup.CreateAcquiringSharedResources(resource, otherRemoteControl.resource);
+        resourceGroup.ConnectSharedResources(resource, otherRemoteControl.resource);
+        resourceGroup.FreeSharedResources();
+    }
+}
+</code>
+</pre>
+
+Some highlights:
+* The remote control now has a resource which, when acquired, prevents all of the buttons being pressed.
+* When combining controls, the resource group is asked to acquire two **disconnected** resources.
+* The two controls are combined by connecting each remote control's resource. In terms of the graph of resources, this means that the buttons on both controls are now all connected. Hence, pressing a button on either control stops any button on the opposite control being pressed!
+
+### Disconnecting Resources
+
+Following from the example above, suppose the owner of the second control, Bob, wants to go home so Alice and Bob need to split the "super remote control" back into two boring regular controls. It would suck if Bob can only play his in his home provided Alice is not playing her game in her home. We need to enable the controls to be used independently again.
+
+We can do this with the following method:
+<pre>
+<code>
+public void RemoveFromControl(RemoteControl otherRemoteControl)
+{
+    var resourceGroup = SharedResourceGroup.CreateAcquiringSharedResources(resource, otherRemoteControl.resource);
+    resourceGroup.DisconnectSharedResources(resource, otherRemoteControl.resource);
+    resourceGroup.FreeSharedResources();
+}
+</code>
+</pre>
+
+<sup>Note: while you could have stopped all buttons being pressed by acquiring either control's resource, resource groups are strict and require you to explicitly acquire any resources you operate on. This is to encourage your code to be aware of what is going on.</sup>
+
+After the above method has been called, two threads can interact with the two controls at the same time, but the only one button on each control can be pressed at any one time.
+
+#### Warning About Disconnecting Resources
+
+There's a long comment in code explaining this (on IResourceGroup). Coming back to graph theory, the disconnect method above only removes any edge it finds directly between the two resources it is given. This means that if the resources were connected in a cycle beforehand, they will remain connected even after the disconnect method has been called.
+
+Possibly warranting some method renaming aside, this is considered a good thing. Your code has not shown enough awareness to be confident it "definitely" wants these resources to be disconnected. You can discover the graph of resources if you *have* to with the following:
+
+<code>resourceGroup.GetSharedResourcesDirectlyConnectedTo(resource);</code>
+
+The above returns all the immediate neighbours of the passed in resource. You can call this on said neighbours repeatedly to discover the structure of the entire graph, but if you need to you probably should try to refactor your code first.
+
+To illustrate why this is a good thing, suppose three remote controls were connected together in a circle - Control A -> Control B -> Control C.
+* If we disconnect control A from control B, should it be possible to use control A and control B at the same time even though control B is connected to C which is connected to A? Probably not.
+* Would it be wise to automatically sever control C's connection from Control A as well? Again, probably not. The connection may have been added somewhere else completely in code, so you have no idea how important it is that these controls remain synchronised
+* Would you be happy that this other area of code could also invalidate your code's belief the controls are synchronised? Hopefully not! That would be scary!!
+
