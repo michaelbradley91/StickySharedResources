@@ -274,22 +274,25 @@ Implementation Details
 ### Efficiency
 Each set of connected resources is locked by a single semaphore. This makes acquiring a large set of connected resources very cheap - O(1) ish ignoring other threads and flattening (below).
 
-Connecting two resources is also essentially O(1) (always, as you've acquired them already). This is handled in a similar way to a disjoint set forest - the resources' parents are given a new shared parent (which is basically a semaphore). Whenever the parent is retrieved, the chain is immediately flattened to ensure at least decent amortised performance.
+Connecting two resources is also essentially O(1). This is handled in a similar way to a disjoint set forest - the resources' parents are given a new shared parent (which is basically a semaphore). Whenever the parent is retrieved, the chain is immediately flattened to ensure at least decent amortised performance.
 
-Disconnecting resources is more expensive. This can probably be improved, but currently disconnecting resource A from resource B takes time linear in the size of their original connected group. This is because their parent semaphores might need to be reset on each individual semaphore.
+Disconnecting resources is more expensive. This can probably be improved, but currently disconnecting resource A from resource B takes time linear in the size of their original connected group. This is because their parent semaphores might need to be reset for each individual resource.
 
-Acquiring disconnected resources in a resource group is done as follows (efficiency quite hard to measure, but generally extremely quick)
+Acquiring disconnected resources in a resource group is done as follows:
+
 1. Gather all the unique semaphores needs to acquire all the resources (at most one per resource).
 2. Acquire each one in ascending order.
 3. If after acquiring the resource, it is still the correct resource to acquire next, keep it and repeat on the next resource.
 
-Step 3 can cause restarts. If the process restarts enough times, it closes something called a "gate", which prevents further "new" resource groups from doing anything until this resource group has finished. This enforces a form of fairness.
+Step 3 can cause restarts. If the process restarts enough times, it closes something called a **gate**, which prevents further **new** resource groups from doing anything until this resource group has finished. This enforces a form of fairness.
 
 ### Memory
 Resource groups are linear in the number of resources they were asked to acquire.
-A resource individually can vary in memory, but if you have n resources the most memory they require is linear in n (ignoring big integers).
+
+An individual resource can vary in memory, but if you have n resources the most memory they require is linear in n (ignoring big integers).
 
 ### Deadlock handling
 A resource group avoids deadlock while acquiring disconnected resources by:
+
 1. Always acquiring the resources in ascending order.
 2. Relying on resources only ever increasing. Note that by increasing, resources can change the order in which they should be acquired, causing the acquisition process to partially restart. However, any resource already acquired can be kept.
