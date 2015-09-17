@@ -2,3 +2,7 @@ C:\Users\Developer\Documents\Fun\Repositories\Pipes\Pipes\SharedResources\bin\De
 C:\Users\Developer\Documents\Fun\Repositories\Pipes\Pipes\SharedResources\bin\Debug\SharedResources.pdb
 C:\Users\Developer\Documents\Fun\Repositories\Pipes\Pipes\SharedResources\obj\Debug\SharedResources.dll
 C:\Users\Developer\Documents\Fun\Repositories\Pipes\Pipes\SharedResources\obj\Debug\SharedResources.pdb
+C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\bin\Debug\SharedResources.dll
+C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\bin\Debug\SharedResources.pdb
+C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\obj\Debug\SharedResources.dll
+C:\Users\Developer\Documents\Fun\Repositories\StickySharedResources\StickySharedResources\SharedResources\obj\Debug\SharedResources.pdb
