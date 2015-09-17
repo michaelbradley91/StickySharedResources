@@ -186,11 +186,12 @@ Suppose later someone comes along with another remote control, and now it is pos
 <code>
 public class RemoteControl
 {
-    private readonly SharedResource resource;
     public readonly Button LeftButton;
     public readonly Button RightButton;
     public readonly Button UpButton;
     public readonly Button DownButton;
+    
+    private readonly SharedResource resource;
 
     public RemoteControl()
     {
