@@ -27,7 +27,7 @@ The name **Sticky Shared Resources** comes from the following:
 Code Examples
 -------------
 ### Getting started
-To do anything, you first need to create an empty resource group. This is your only way of creating new resources.
+To do anything, you first need to create an empty resource group. Resource groups are the only way to create resources.
 
 <code>var resourceGroup = SharedResourceGroup.CreateWithNoAcquiredSharedResources();</code>
 
@@ -37,7 +37,7 @@ To create your first resource:
 
 <code>var resource = resourceGroup.CreateAndAcquireSharedResource();</code>
 
-This resource is currently acquired by the above resource group. If you try to acquire it with a different resource group, you'll be forced to wait until the resource group above has released it.
+This resource is automatically acquired by the resource group. If you try to acquire it with a different resource group, you'll be forced to wait until the resource group above has freed it.
 
 A resource is just a "representation" of some actual object used by multiple threads - say a button on a remote control. When you push the button, it will first acquire its resource before processing your input. If you want to remember the object associated to a resource in a more complicated scenario, you can use:
 
@@ -45,11 +45,11 @@ A resource is just a "representation" of some actual object used by multiple thr
 
 <sup>Note that this field is not synchronised in any way, so you should generally only set it once.
 
-Once you're done with the resource/s in the resource group, you free all of them at once as follows:
+Once you're done with the resource/s in the resource group, you free them all at once as follows:
 
 <code>resourceGroup.FreeSharedResources();</code>
 
-Suppose you want to acquire the resource later, so your thread has access and you know that no other thread does? You would do this:
+What if you want to acquire the resource later, so your thread has access and you know that no other thread does? You simply do this:
 
 <code>var resourceGroup = SharedResourceGroup.CreateAcquiringSharedResources(resource);</code>
 
@@ -88,5 +88,7 @@ public class ConvolutedSemaphore
 }
 </code>
 </pre>
+
+This example is designed to show that resource groups are powerful - they are able to do anything binary semaphores can.
 
 ### Connecting Resources
