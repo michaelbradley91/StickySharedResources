@@ -106,5 +106,51 @@ namespace SharedResources.SharedResources
             }
             return allConnectedSharedResources.ToList();
         }
+
+        /// <summary>
+        /// Create a new shared resource and automatically connect it to this shared resource.
+        /// This will acquire this resource during the operation, so you must not have acquired this already.
+        /// This operation will free all its resources once it is finished.
+        /// </summary>
+        public SharedResource CreateAndConnect()
+        {
+            var resourceGroup = SharedResourceGroup.CreateAcquiringSharedResources(this);
+
+            var childResource = resourceGroup.CreateAndAcquireSharedResource();
+            resourceGroup.ConnectSharedResources(this, childResource);
+            resourceGroup.FreeSharedResources();
+
+            return childResource;
+        }
+        
+        /// <summary>
+        /// Create a new shared resource. The resource is not acquired after this method has returned.
+        /// </summary>
+        public static SharedResource Create()
+        {
+            var resourceGroup = SharedResourceGroup.CreateWithNoAcquiredSharedResources();
+            var resource = resourceGroup.CreateAndAcquireSharedResource();
+            resourceGroup.FreeSharedResources();
+            return resource;
+        }
+
+        /// <summary>
+        /// Create a new shared resource connected directly to each child resource passed in.
+        /// This will aquire all child resources, so you must not have acquired these already.
+        /// This operation will free all its resources once it is finished.
+        /// </summary>
+        public static SharedResource CreateAndConnect(params SharedResource[] childResources)
+        {
+            var resourceGroup = SharedResourceGroup.CreateAcquiringSharedResources(childResources);
+
+            var parentResource = resourceGroup.CreateAndAcquireSharedResource();
+            foreach (var childResource in childResources)
+            {
+                resourceGroup.ConnectSharedResources(parentResource, childResource);
+            }
+            resourceGroup.FreeSharedResources();
+
+            return parentResource;
+        }
     }
 }

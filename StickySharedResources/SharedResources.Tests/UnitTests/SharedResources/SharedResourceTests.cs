@@ -271,5 +271,57 @@ namespace SharedResources.Tests.UnitTests.SharedResources
             // Assert
             sharedResource.AssociatedObject.Should().Be(associatedObject);
         }
+
+        [Test]
+        public void Create_CreatesANewSharedResource_WhichIsNotAcquired()
+        {
+            // Act
+            var sharedResource = SharedResource.Create();
+            
+            // Assert
+            sharedResource.Should().NotBeNull();
+            SharedResourceGroup.CreateAcquiringSharedResources(sharedResource);
+            // As the above did not block, the resource was not acquired.
+        }
+
+        [Test]
+        public void CreateAndConnect_CreatesANewSharedResource_AndNeitherResourceIsAcquired()
+        {
+            // Arrange
+            var parentSharedResource = SharedResource.Create();
+            
+            // Act
+            var childSharedResource = parentSharedResource.CreateAndConnect();
+
+            // Assert
+            childSharedResource.Should().NotBeNull();
+            childSharedResource.DirectlyConnectedSharedResources.Should().HaveCount(2);
+            childSharedResource.DirectlyConnectedSharedResources.Should().Contain(childSharedResource);
+            childSharedResource.DirectlyConnectedSharedResources.Should().Contain(parentSharedResource);
+            SharedResourceGroup.CreateAcquiringSharedResources(childSharedResource, parentSharedResource);
+            // As the above did not block, the resources were not acquired.
+        }
+
+        [Test]
+        public void CreateAndConnect_CreatesANewSharedResource_DirectlyConnectedToAllChildResources_AndNoneAreAcquired()
+        {
+            // Arrange
+            var childSharedResource1 = SharedResource.Create();
+            var childSharedResource2 = SharedResource.Create();
+            var childSharedResource3 = SharedResource.Create();
+
+            // Act
+            var parentSharedResource = SharedResource.CreateAndConnect(childSharedResource1, childSharedResource2, childSharedResource3);
+
+            // Assert
+            parentSharedResource.Should().NotBeNull();
+            parentSharedResource.DirectlyConnectedSharedResources.Should().HaveCount(4);
+            parentSharedResource.DirectlyConnectedSharedResources.Should().Contain(parentSharedResource);
+            parentSharedResource.DirectlyConnectedSharedResources.Should().Contain(childSharedResource1);
+            parentSharedResource.DirectlyConnectedSharedResources.Should().Contain(childSharedResource2);
+            parentSharedResource.DirectlyConnectedSharedResources.Should().Contain(childSharedResource3);
+            SharedResourceGroup.CreateAcquiringSharedResources(parentSharedResource, childSharedResource1, childSharedResource2, childSharedResource3);
+            // As the above did not block, the resources were not acquired.
+        }
     }
 }
